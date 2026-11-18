@@ -305,6 +305,15 @@ def save_assets(release, directory):
     return digests
 
 
+def preview_releases_url(channel):
+    return f"https://github.com/{REPO}/releases?q={channel}+prerelease%3Atrue"
+
+
+def preview_navigation():
+    return (f"**预发布下载 / Pre-releases:** [macOS Beta]({preview_releases_url('Beta')}) · "
+            f"[macOS Nightly]({preview_releases_url('Nightly')})")
+
+
 def notes(release):
     source = release.source
     lines = [f"Original installers from [the official download page]({source.url}).", "",
@@ -314,6 +323,8 @@ def notes(release):
         if release.build:
             url += f"#version-{release.build}"
         lines += [f"[Official release notes]({url})", ""]
+    if source.latest:
+        lines[:0] = [preview_navigation(), ""]
     if source.platform == "linux":
         lines += ["Linux package checksums were verified against the signed upstream manifest. "
                   "The original manifest and Sigstore bundle are included.", ""]

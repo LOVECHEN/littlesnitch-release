@@ -30,7 +30,13 @@ class ReleaseIndexTest(unittest.TestCase):
              "mac-nightly-6.10-7309 mac-stable-6.9").split(),
         )
         self.assertIn("download-nightly.html", result)
-        self.assertIn("mac-nightly-6.10-7309", result.split("## macOS 7 Beta", 1)[0])
+        self.assertLess(result.index("## macOS 7 Beta"), result.index("## macOS Nightly"))
+        nightly_section = result.split("## macOS Nightly", 1)[1].split("## ", 1)[0]
+        self.assertIn("mac-nightly-6.10-7309", nightly_section)
+
+    def test_newer_nightly_takes_first_shortcut(self):
+        result = index.render([release("mac-beta-7.0-8020"), release("mac-nightly-7.1-8030")])
+        self.assertLess(result.index("## macOS Nightly"), result.index("## macOS 7 Beta"))
 
     def test_linux_prereleases_sort_numerically_after_stable(self):
         tags = ("linux-prerelease-1.2.3-pre2", "linux-prerelease-1.2.3-pre10", "linux-stable-1.2.3")

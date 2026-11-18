@@ -35,6 +35,8 @@ class DiscoveryTest(unittest.TestCase):
         self.assertEqual(release.tag, "mac-stable-6.5")
         self.assertEqual(len(release.assets), 1)
         self.assertTrue(release.source.latest)
+        self.assertIn("Beta+prerelease%3Atrue", mirror.notes(release))
+        self.assertIn("Nightly+prerelease%3Atrue", mirror.notes(release))
 
     def test_mac_build_tags(self):
         for source, version, build in ((NIGHTLY, "6.5.1", "7309"), (BETA, "7.0", "8020")):

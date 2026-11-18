@@ -8,7 +8,9 @@ import re
 import sys
 from urllib.parse import quote
 
-from scripts.mirror import CHECKSUMS, REPO, SOURCES, VERSION, list_releases, version_key
+from scripts.mirror import (
+    CHECKSUMS, REPO, SOURCES, VERSION, list_releases, preview_releases_url, version_key,
+)
 
 
 START = "<!-- release-index:start -->"
@@ -94,14 +96,21 @@ def render(releases):
         raise ValueError("No complete published releases; refusing to clear the index")
 
     lines = []
-    for channel, title in (("nightly", "macOS Nightly"), ("beta", "macOS 7 Beta")):
-        source = SOURCES_BY_PREFIX[f"mac-{channel}"]
+    shortcuts = []
+    for channel, title in (("beta", "macOS 7 Beta"), ("nightly", "macOS Nightly")):
         latest = next((entry for entry in entries
                        if (entry.platform, entry.channel) == ("mac", channel)), None)
+        shortcuts.append((channel, title, latest))
+
+    for channel, title, latest in sorted(
+        shortcuts, key=lambda shortcut: shortcut[2].sort_key if shortcut[2] else (), reverse=True
+    ):
+        source = SOURCES_BY_PREFIX[f"mac-{channel}"]
         lines += [f"## {title}", "", f"[官方下载页]({source.url})"]
         if latest:
             lines[-1] += (f" · [镜像 {latest.display_version}]({latest.release_url})"
                           f" · {latest.download_links} · [SHA-256]({latest.asset_url(CHECKSUMS)})")
+        lines[-1] += f" · [GitHub 全部 {CHANNELS[channel]}]({preview_releases_url(CHANNELS[channel])})"
         lines.append("")
 
     lines += ["## 按版本下载", ""]
