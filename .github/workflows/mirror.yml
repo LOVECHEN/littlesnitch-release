@@ -1,0 +1,42 @@
+name: Mirror Little Snitch releases
+
+on:
+  schedule:
+    - cron: '23 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Discover, verify downloads, or publish
+        type: choice
+        options: [publish, verify, discover]
+        default: publish
+
+permissions:
+  contents: read
+
+concurrency:
+  group: littlesnitch-mirror
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    if: github.repository == 'LOVECHEN/littlesnitch-release' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Test discovery and integrity checks
+        run: python3 -B -m unittest discover -s tests -v
+      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+        if: inputs.mode != 'discover'
+        with:
+          cosign-release: v3.1.4
+      - name: Mirror official downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MODE: ${{ inputs.mode || 'publish' }}
+        run: python3 -B scripts/mirror.py "$MODE"
