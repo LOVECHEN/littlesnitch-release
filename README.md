@@ -1,20 +1,20 @@
 # Little Snitch for macOS & Linux 官方安装包镜像
 
-[按版本下载](#按版本下载) · [macOS 7 Beta](#macos-7-beta) · [macOS Nightly](#macos-nightly) · [GitHub 正式版](https://github.com/LOVECHEN/littlesnitch-release/releases) · [GitHub 预发布](https://github.com/LOVECHEN/littlesnitch-release/releases?q=prerelease%3Atrue) · [English](#english)
+[按版本下载](#按版本下载) · [macOS 7 Beta](#macos-7-beta) · [macOS Nightly](#macos-nightly) · [GitHub Releases](https://github.com/LOVECHEN/littlesnitch-release/releases) · [English](#english)
 
 自动归档 Objective Development 下载页公开提供的原始安装包，不修改包内容。每 6 小时检查一次，也可在 Actions 手动运行。安装包只放在 Releases，不进入 Git 历史。
 
-GitHub 默认 Releases 页和右侧的「On this page」只列正式版。查看预发布请使用 [Beta Releases](https://github.com/LOVECHEN/littlesnitch-release/releases?q=Beta+prerelease%3Atrue) 或 [Nightly Releases](https://github.com/LOVECHEN/littlesnitch-release/releases?q=Nightly+prerelease%3Atrue)。下方索引同时收录各通道，macOS 和 Linux 分别按版本号降序，同版本按构建号降序，并由 Actions 更新。
+macOS 的 Beta 和 Nightly 用标题标明通道，和正式版一起显示在 GitHub 默认 Releases 列表里；Latest 仍指向正式版。下方索引由 Actions 更新，macOS 和 Linux 分别按版本号降序，同版本按构建号降序。
 
 <!-- release-index:start -->
 
 ## macOS 7 Beta
 
-[官方下载页](https://obdev.at/products/littlesnitch7-beta/index.html) · [镜像 7.0 (8020)](https://github.com/LOVECHEN/littlesnitch-release/releases/tag/mac-beta-7.0-8020) · [DMG](https://github.com/LOVECHEN/littlesnitch-release/releases/download/mac-beta-7.0-8020/LittleSnitch-7.0-beta-8020.dmg) · [SHA-256](https://github.com/LOVECHEN/littlesnitch-release/releases/download/mac-beta-7.0-8020/SHA256SUMS.txt) · [GitHub 全部 Beta](https://github.com/LOVECHEN/littlesnitch-release/releases?q=Beta+prerelease%3Atrue)
+[官方下载页](https://obdev.at/products/littlesnitch7-beta/index.html) · [镜像 7.0 (8020)](https://github.com/LOVECHEN/littlesnitch-release/releases/tag/mac-beta-7.0-8020) · [DMG](https://github.com/LOVECHEN/littlesnitch-release/releases/download/mac-beta-7.0-8020/LittleSnitch-7.0-beta-8020.dmg) · [SHA-256](https://github.com/LOVECHEN/littlesnitch-release/releases/download/mac-beta-7.0-8020/SHA256SUMS.txt) · [GitHub 全部 Beta](https://github.com/LOVECHEN/littlesnitch-release/releases?q=Beta)
 
 ## macOS Nightly
 
-[官方下载页](https://obdev.at/products/littlesnitch/download-nightly.html) · [镜像 6.5.1 (7309)](https://github.com/LOVECHEN/littlesnitch-release/releases/tag/mac-nightly-6.5.1-7309) · [DMG](https://github.com/LOVECHEN/littlesnitch-release/releases/download/mac-nightly-6.5.1-7309/LittleSnitch-6.5.1-nightly-7309.dmg) · [SHA-256](https://github.com/LOVECHEN/littlesnitch-release/releases/download/mac-nightly-6.5.1-7309/SHA256SUMS.txt) · [GitHub 全部 Nightly](https://github.com/LOVECHEN/littlesnitch-release/releases?q=Nightly+prerelease%3Atrue)
+[官方下载页](https://obdev.at/products/littlesnitch/download-nightly.html) · [镜像 6.5.1 (7309)](https://github.com/LOVECHEN/littlesnitch-release/releases/tag/mac-nightly-6.5.1-7309) · [DMG](https://github.com/LOVECHEN/littlesnitch-release/releases/download/mac-nightly-6.5.1-7309/LittleSnitch-6.5.1-nightly-7309.dmg) · [SHA-256](https://github.com/LOVECHEN/littlesnitch-release/releases/download/mac-nightly-6.5.1-7309/SHA256SUMS.txt) · [GitHub 全部 Nightly](https://github.com/LOVECHEN/littlesnitch-release/releases?q=Nightly)
 
 ## 按版本下载
 

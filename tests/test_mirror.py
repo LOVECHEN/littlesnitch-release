@@ -35,8 +35,8 @@ class DiscoveryTest(unittest.TestCase):
         self.assertEqual(release.tag, "mac-stable-6.5")
         self.assertEqual(len(release.assets), 1)
         self.assertTrue(release.source.latest)
-        self.assertIn("Beta+prerelease%3Atrue", mirror.notes(release))
-        self.assertIn("Nightly+prerelease%3Atrue", mirror.notes(release))
+        self.assertIn("/releases?q=Beta)", mirror.notes(release))
+        self.assertIn("/releases?q=Nightly)", mirror.notes(release))
 
     def test_mac_build_tags(self):
         for source, version, build in ((NIGHTLY, "6.5.1", "7309"), (BETA, "7.0", "8020")):
@@ -45,6 +45,7 @@ class DiscoveryTest(unittest.TestCase):
             [release] = mirror.discover(source, page(path))
             self.assertEqual(release.tag, f"mac-{channel}-{version}-{build}")
             self.assertTrue(release.source.prerelease)
+            self.assertFalse(release.source.github_prerelease)
             self.assertEqual(release.assets[0].published_name, f"LittleSnitch-{version}-{channel}-{build}.dmg")
             self.assertIn(release.assets[0].name, mirror.notes(release))
 
@@ -58,6 +59,7 @@ class DiscoveryTest(unittest.TestCase):
     def test_linux_prerelease_groups_all_packaging_spellings(self):
         [release] = mirror.discover(LINUX_PRE, linux_page(*PRE_FILES, PRE_FILES[0]))
         self.assertEqual(release.tag, "linux-prerelease-1.1.2-pre1")
+        self.assertTrue(release.source.github_prerelease)
         self.assertEqual(len(release.assets), 6)
         self.assertEqual(release.assets[0].published_name, "littlesnitch_1.1.2-pre1_amd64.deb")
 

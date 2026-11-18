@@ -59,6 +59,11 @@ class Source:
         return self.channel in {"nightly", "beta", "prerelease"}
 
     @property
+    def github_prerelease(self):
+        # macOS previews use title labels so they appear in GitHub's default listing.
+        return self.platform == "linux" and self.prerelease
+
+    @property
     def latest(self):
         return (self.platform, self.channel) == ("mac", "stable")
 
@@ -306,7 +311,7 @@ def save_assets(release, directory):
 
 
 def preview_releases_url(channel):
-    return f"https://github.com/{REPO}/releases?q={channel}+prerelease%3Atrue"
+    return f"https://github.com/{REPO}/releases?q={channel}"
 
 
 def preview_navigation():
@@ -361,10 +366,11 @@ def verify_uploaded(tag, digests, uploaded):
 
 def publish(release, previous, directory):
     expected_names = {CHECKSUMS} | {asset.published_name for asset in release.assets}
+    prerelease = release.source.github_prerelease
     if previous and not previous["draft"]:
         existing = {asset["name"] for asset in previous["assets"]
                     if asset["state"] == "uploaded" and (asset.get("digest") or "").startswith("sha256:")}
-        if not expected_names <= existing or previous["prerelease"] != release.source.prerelease:
+        if not expected_names <= existing or previous["prerelease"] != prerelease:
             raise ValueError(f"Unexpected files or metadata in existing release {release.tag}")
         print(f"Already published: {release.tag}", flush=True)
         return
@@ -372,7 +378,7 @@ def publish(release, previous, directory):
     digests = save_assets(release, directory)
     if not previous:
         gh("release", "create", release.tag, "-R", REPO, "--draft", "--latest=false",
-           f"--prerelease={str(release.source.prerelease).lower()}", "--title", release.title,
+           f"--prerelease={str(prerelease).lower()}", "--title", release.title,
            "--notes", notes(release), "--target", os.environ["GITHUB_SHA"])
     uploaded = release_assets(release.tag)
     if not uploaded.keys() <= digests.keys():
@@ -388,7 +394,7 @@ def publish(release, previous, directory):
     verify_uploaded(release.tag, digests, release_assets(release.tag))
     gh("release", "edit", release.tag, "-R", REPO, "--draft=false",
        f"--latest={str(release.source.latest).lower()}",
-       f"--prerelease={str(release.source.prerelease).lower()}")
+       f"--prerelease={str(prerelease).lower()}")
 
 
 def main():

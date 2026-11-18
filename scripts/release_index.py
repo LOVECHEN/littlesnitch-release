@@ -65,7 +65,7 @@ def parse_release(item):
         return None
     platform, channel, version, suffix = match.groups()
     source = SOURCES_BY_PREFIX.get(f"{platform}-{channel}")
-    if not source or item["prerelease"] != source.prerelease:
+    if not source or item["prerelease"] != source.github_prerelease:
         return None
     if channel in {"nightly", "beta"}:
         if not suffix or not suffix.isdigit():

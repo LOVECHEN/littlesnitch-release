@@ -8,7 +8,7 @@ def release(tag, filename="LittleSnitch.dmg", *, draft=False, checksums=True):
     return {
         "tag_name": tag,
         "draft": draft,
-        "prerelease": any(f"-{channel}-" in tag for channel in ("beta", "nightly", "prerelease")),
+        "prerelease": tag.startswith("linux-prerelease-"),
         "assets": [{"name": name, "state": "uploaded"} for name in names],
     }
 
