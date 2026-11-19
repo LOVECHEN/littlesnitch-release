@@ -36,8 +36,6 @@ class DiscoveryTest(unittest.TestCase):
         self.assertEqual(release.legacy_tag, "mac-stable-6.5")
         self.assertEqual(len(release.assets), 1)
         self.assertTrue(release.source.latest)
-        self.assertIn("/releases?q=Beta)", mirror.notes(release))
-        self.assertIn("/releases?q=Nightly)", mirror.notes(release))
 
     def test_mac_build_tags(self):
         for source, version, build in ((NIGHTLY, "6.5.1", "7309"), (BETA, "7.0", "8020")):
@@ -48,7 +46,6 @@ class DiscoveryTest(unittest.TestCase):
             self.assertTrue(release.source.prerelease)
             self.assertFalse(release.source.github_prerelease)
             self.assertEqual(release.assets[0].published_name, f"LittleSnitch-{version}-{channel}-{build}.dmg")
-            self.assertIn(release.assets[0].name, mirror.notes(release))
 
     def test_mac_tags_sort_by_version_before_channel(self):
         versions = [
@@ -155,6 +152,16 @@ class IntegrityTest(unittest.TestCase):
             mirror.verify_uploaded("tag", {"pkg": "bad"}, uploaded)
         with self.assertRaisesRegex(ValueError, "filenames"):
             mirror.verify_uploaded("tag", {"renamed": "abc"}, uploaded)
+
+    def test_release_notes_are_only_a_sorted_sha256_table(self):
+        digests = {"z.dmg": "a" * 64, mirror.CHECKSUMS: "b" * 64, "a.dmg": "c" * 64}
+        self.assertEqual(mirror.notes(digests), "\n".join([
+            "| 文件名 | SHA-256 |",
+            "|---|---|",
+            f"| `a.dmg` | `{'c' * 64}` |",
+            f"| `z.dmg` | `{'a' * 64}` |",
+            "",
+        ]))
 
     def test_complete_published_release_does_not_download_again(self):
         [release] = mirror.discover(

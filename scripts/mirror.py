@@ -48,7 +48,6 @@ class Source:
     channel: str
     path: str
     directory: str = ""
-    notes: str = ""
 
     @property
     def url(self):
@@ -79,13 +78,10 @@ class Source:
 
 
 SOURCES = (
-    Source("mac", "stable", "littlesnitch/download.html",
-           notes="littlesnitch/releasenotes.html"),
-    Source("mac", "nightly", "littlesnitch/download-nightly.html", "nightly/",
-           "littlesnitch/releasenotes.html"),
+    Source("mac", "stable", "littlesnitch/download.html"),
+    Source("mac", "nightly", "littlesnitch/download-nightly.html", "nightly/"),
     Source("mac", "legacy", "littlesnitch/download-previous-versions.html", "legacy/"),
-    Source("mac", "beta", "littlesnitch7-beta/index.html", "beta/",
-           "littlesnitch7-beta/releasenotes.html"),
+    Source("mac", "beta", "littlesnitch7-beta/index.html", "beta/"),
     Source("linux", "stable", "littlesnitch-linux/download.html"),
     Source("linux", "prerelease", "littlesnitch-linux/download-prerelease.html", "prerelease/"),
 )
@@ -323,33 +319,10 @@ def save_assets(release, directory):
     return digests
 
 
-def preview_releases_url(channel):
-    return f"https://github.com/{REPO}/releases?q={channel}"
-
-
-def preview_navigation():
-    return (f"**预发布下载 / Pre-releases:** [macOS Beta]({preview_releases_url('Beta')}) · "
-            f"[macOS Nightly]({preview_releases_url('Nightly')})")
-
-
-def notes(release):
-    source = release.source
-    lines = [f"Original installers from [the official download page]({source.url}).", "",
-             f"Verify mirrored files with `shasum -a 256 -c {CHECKSUMS}`.", ""]
-    if source.notes:
-        url = f"{ORIGIN}/products/{source.notes}"
-        if release.build:
-            url += f"#version-{release.build}"
-        lines += [f"[Official release notes]({url})", ""]
-    if source.latest:
-        lines[:0] = [preview_navigation(), ""]
-    if source.platform == "linux":
-        lines += ["Linux package checksums were verified against the signed upstream manifest. "
-                  "The original manifest and Sigstore bundle are included.", ""]
-    if any(asset.name != asset.published_name for asset in release.assets):
-        lines += ["GitHub-compatible filenames are used in the mirror. The original filenames "
-                  "are shown below and the file contents are unchanged.", ""]
-    lines.extend(f"- [`{asset.name}`](<{asset.url}>)" for asset in release.assets)
+def notes(digests):
+    lines = ["| 文件名 | SHA-256 |", "|---|---|"]
+    lines.extend(f"| `{name}` | `{digest}` |" for name, digest in sorted(digests.items())
+                 if name != CHECKSUMS)
     return "\n".join(lines) + "\n"
 
 
@@ -394,10 +367,11 @@ def publish(release, previous, directory):
         return
 
     digests = save_assets(release, directory)
+    body = notes(digests)
     if not previous:
         gh("release", "create", tag, "-R", REPO, "--draft", "--latest=false",
            f"--prerelease={str(prerelease).lower()}", "--title", release.title,
-           "--notes", notes(release), "--target", os.environ["GITHUB_SHA"])
+           "--notes", body, "--target", os.environ["GITHUB_SHA"])
     uploaded = release_assets(tag)
     if not uploaded.keys() <= digests.keys():
         raise ValueError(f"Unexpected assets in existing draft {tag}")
@@ -411,6 +385,7 @@ def publish(release, previous, directory):
         gh("release", "upload", tag, "-R", REPO, *missing)
     verify_uploaded(tag, digests, release_assets(tag))
     gh("release", "edit", tag, "-R", REPO, "--draft=false",
+       "--notes", body,
        f"--latest={str(release.source.latest).lower()}",
        f"--prerelease={str(prerelease).lower()}")
 
