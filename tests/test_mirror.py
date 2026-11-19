@@ -76,6 +76,18 @@ class DiscoveryTest(unittest.TestCase):
         self.assertEqual(mirror.official_build_hint(mirror.Release(LEGACY, "1.2.4", ()), None), "256")
         self.assertEqual(mirror.official_build_hint(mirror.Release(LEGACY, "2.5.4", ()), None), "3019")
 
+    def test_beta_number_matches_both_version_and_build(self):
+        html = (
+            '<h3>Little Snitch 7 beta 1 <span>(8013)</span></h3>'
+            '<h3>Little Snitch 7.0 beta 5 <span class="buildnumber-visible">(8020)</span></h3>'
+            '<h3>Little Snitch 8.0 beta 6 <span>(8020)</span></h3>'
+        )
+        self.assertEqual(mirror.beta_number_from_notes(html, "7.0", "8013"), "1")
+        self.assertEqual(mirror.beta_number_from_notes(html, "7.0", "8020"), "5")
+        self.assertEqual(mirror.beta_number_from_notes(html, "7.0", "8030"), "")
+        html += '<h3>Little Snitch 7.0 beta 6 <span>(8020)</span></h3>'
+        self.assertEqual(mirror.beta_number_from_notes(html, "7.0", "8020"), "")
+
     def test_mac_legacy_with_gzip(self):
         releases = mirror.discover(LEGACY, page(
             "/downloads/littlesnitch/legacy/LittleSnitch-3.8.2.dmg",
@@ -118,6 +130,43 @@ class DiscoveryTest(unittest.TestCase):
 
 
 class IntegrityTest(unittest.TestCase):
+    def test_auto_publish_uses_official_beta_number_without_changing_tag(self):
+        [release] = mirror.discover(
+            BETA, page("/downloads/littlesnitch/beta/LittleSnitch-7.0-beta-(8030).dmg"))
+        html = '<h3>Little Snitch 7.0 beta 6 <span>(8030)</span></h3>'
+        digests = {mirror.CHECKSUMS: "a" * 64, release.assets[0].published_name: "b" * 64}
+        uploaded = {name: {"state": "uploaded", "digest": f"sha256:{digest}"}
+                    for name, digest in digests.items()}
+
+        def download_notes(url, path, _limit):
+            self.assertEqual(url, "https://obdev.at/products/littlesnitch7-beta/releasenotes.html")
+            path.write_text(html, encoding="utf-8")
+
+        with TemporaryDirectory() as directory, patch.object(mirror, "download", download_notes), \
+                patch.object(mirror, "save_assets", return_value=digests), \
+                patch.object(mirror, "release_assets", side_effect=({}, uploaded)), \
+                patch.dict(mirror.os.environ, {"GITHUB_SHA": "test-sha"}), \
+                patch.object(mirror, "gh") as gh:
+            mirror.publish(release, None, Path(directory))
+
+        tag = "mac-v007.000.000-beta-00008030"
+        for call in (gh.call_args_list[0], gh.call_args_list[-1]):
+            self.assertEqual(call.args[2], tag)
+            self.assertIn("Little Snitch for macOS 7.0 (8030) · Beta 6", call.args)
+
+    def test_auto_publish_waits_when_beta_number_is_unknown(self):
+        release = mirror.Release(BETA, "7.0", (), "8030")
+
+        def download_notes(_url, path, _limit):
+            path.write_text('<h3>Little Snitch 7.0 beta 5 <span>(8020)</span></h3>', encoding="utf-8")
+
+        with TemporaryDirectory() as directory, patch.object(mirror, "download", download_notes), \
+                patch.object(mirror, "save_assets") as save, patch.object(mirror, "gh") as gh:
+            with self.assertRaisesRegex(ValueError, "Missing or ambiguous Beta number"):
+                mirror.publish(release, None, Path(directory))
+            save.assert_not_called()
+            gh.assert_not_called()
+
     def test_dmg_and_compressed_dmg(self):
         image = b"disk image contents" + b"koly" + bytes(508)
         with TemporaryDirectory() as directory:

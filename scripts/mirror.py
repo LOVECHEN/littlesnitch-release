@@ -37,6 +37,11 @@ MAC_STABLE_HEADING = re.compile(
     r"<span\b[^>]*>\s*\((\d+)\)\s*</span>\s*</h3>",
     re.IGNORECASE,
 )
+MAC_BETA_HEADING = re.compile(
+    r"<h3\b[^>]*>\s*Little\s+Snitch\s+([0-9]+(?:\.[0-9]+){0,3})\s+beta\s+([1-9][0-9]*)\s*"
+    r"<span\b[^>]*>\s*\(([0-9]+)\)\s*</span>\s*</h3>",
+    re.IGNORECASE,
+)
 LINUX_ID = re.compile(rf"littlesnitch-(?P<version>{VERSION}(?:-pre\d+)?)"
                       r"\.hashes\.txt(?:\.sig\.github\.json)?")
 LINUX_PACKAGES = (
@@ -126,11 +131,16 @@ class Release:
         build = f"-{int(self.build):08d}" if self.build else ""
         return f"mac-v{version}-{self.source.channel}{build}"
 
-    def title(self, build_hint=""):
+    def title(self, build_hint="", *, beta_number=""):
         product = "macOS" if self.source.platform == "mac" else "Linux"
         number = self.build or build_hint
         build = f" ({number})" if number else ""
-        return f"Little Snitch for {product} {self.version}{build} · {self.source.channel.title()}"
+        channel = self.source.channel.title()
+        if self.source.channel == "beta":
+            if not beta_number:
+                raise ValueError(f"Missing or ambiguous Beta number in official release notes for {self.tag}")
+            channel = f"Beta {beta_number}"
+        return f"Little Snitch for {product} {self.version}{build} · {channel}"
 
 
 def official(url):
@@ -277,6 +287,28 @@ def official_build_hint(release, directory):
     return ""
 
 
+def beta_number_from_notes(html, version, build):
+    def components(number):
+        parts = tuple(map(int, number.split(".")))
+        return parts + (0,) * (4 - len(parts))
+
+    expected = components(version)
+    matches = {
+        ordinal for number, ordinal, note_build in MAC_BETA_HEADING.findall(html)
+        if note_build == build and components(number) == expected
+    }
+    return matches.pop() if len(matches) == 1 else ""
+
+
+def official_release_title(release, directory):
+    if release.source.channel != "beta":
+        return release.title(official_build_hint(release, directory))
+    file = directory / "release-notes.html"
+    download(urljoin(release.source.url, "releasenotes.html"), file, 4 * MIB)
+    ordinal = beta_number_from_notes(file.read_text(encoding="utf-8"), release.version, release.build)
+    return release.title(beta_number=ordinal)
+
+
 def validate_dmg(path, compressed):
     if compressed:
         with gzip.open(path, "rb") as image:
@@ -397,9 +429,9 @@ def publish(release, previous, directory):
         print(f"Already published: {tag}", flush=True)
         return
 
+    title = official_release_title(release, directory)
     digests = save_assets(release, directory)
     body = notes(digests)
-    title = release.title(official_build_hint(release, directory))
     if not previous:
         gh("release", "create", tag, "-R", REPO, "--draft", "--latest=false",
            f"--prerelease={str(prerelease).lower()}", "--title", title,
