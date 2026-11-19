@@ -109,8 +109,21 @@ class Release:
     build: str = ""
 
     @property
-    def tag(self):
+    def legacy_tag(self):
         return f"{self.source.prefix}-{self.version}" + (f"-{self.build}" if self.build else "")
+
+    @property
+    def tag(self):
+        if self.source.platform != "mac":
+            return self.legacy_tag
+        # Put the numeric version before the channel in GitHub's native release list.
+        parts = [int(part) for part in self.version.split(".")]
+        parts += [0] * (3 - len(parts))
+        if len(parts) == 4 and not parts[-1]:
+            parts.pop()
+        version = ".".join(f"{part:03d}" for part in parts)
+        build = f"-{int(self.build):08d}" if self.build else ""
+        return f"mac-v{version}-{self.source.channel}{build}"
 
     @property
     def title(self):
@@ -350,6 +363,10 @@ def list_releases():
     return {item["tag_name"]: item for page in data for item in page}
 
 
+def existing_release(release, published):
+    return published.get(release.tag, published.get(release.legacy_tag))
+
+
 def release_assets(tag):
     result = json.loads(gh("release", "view", tag, "-R", REPO, "--json", "assets", capture=True))
     return {asset["name"]: asset for asset in result["assets"]}
@@ -365,34 +382,35 @@ def verify_uploaded(tag, digests, uploaded):
 
 
 def publish(release, previous, directory):
+    tag = previous["tag_name"] if previous else release.tag
     expected_names = {CHECKSUMS} | {asset.published_name for asset in release.assets}
     prerelease = release.source.github_prerelease
     if previous and not previous["draft"]:
         existing = {asset["name"] for asset in previous["assets"]
                     if asset["state"] == "uploaded" and (asset.get("digest") or "").startswith("sha256:")}
         if not expected_names <= existing or previous["prerelease"] != prerelease:
-            raise ValueError(f"Unexpected files or metadata in existing release {release.tag}")
-        print(f"Already published: {release.tag}", flush=True)
+            raise ValueError(f"Unexpected files or metadata in existing release {tag}")
+        print(f"Already published: {tag}", flush=True)
         return
 
     digests = save_assets(release, directory)
     if not previous:
-        gh("release", "create", release.tag, "-R", REPO, "--draft", "--latest=false",
+        gh("release", "create", tag, "-R", REPO, "--draft", "--latest=false",
            f"--prerelease={str(prerelease).lower()}", "--title", release.title,
            "--notes", notes(release), "--target", os.environ["GITHUB_SHA"])
-    uploaded = release_assets(release.tag)
+    uploaded = release_assets(tag)
     if not uploaded.keys() <= digests.keys():
-        raise ValueError(f"Unexpected assets in existing draft {release.tag}")
+        raise ValueError(f"Unexpected assets in existing draft {tag}")
     for name, asset in uploaded.items():
-        verify_uploaded(release.tag, {name: digests[name]}, {name: asset})
+        verify_uploaded(tag, {name: digests[name]}, {name: asset})
     labels = {asset.published_name: asset.name for asset in release.assets
               if asset.published_name != asset.name}
     missing = [str(directory / name) + (f"#{labels[name]}" if name in labels else "")
                for name in sorted(digests.keys() - uploaded.keys())]
     if missing:
-        gh("release", "upload", release.tag, "-R", REPO, *missing)
-    verify_uploaded(release.tag, digests, release_assets(release.tag))
-    gh("release", "edit", release.tag, "-R", REPO, "--draft=false",
+        gh("release", "upload", tag, "-R", REPO, *missing)
+    verify_uploaded(tag, digests, release_assets(tag))
+    gh("release", "edit", tag, "-R", REPO, "--draft=false",
        f"--latest={str(release.source.latest).lower()}",
        f"--prerelease={str(prerelease).lower()}")
 
@@ -424,7 +442,7 @@ def main():
                     if mode == "verify":
                         save_assets(release, Path(temp_release))
                     else:
-                        publish(release, published.get(release.tag), Path(temp_release))
+                        publish(release, existing_release(release, published), Path(temp_release))
             except (OSError, EOFError, ValueError, KeyError, HTTPException, subprocess.SubprocessError) as error:
                 errors.append(f"{release.tag}: {error}")
         print(f"Discovered {len(releases)} releases and {sum(len(r.assets) for r in releases)} official files.",

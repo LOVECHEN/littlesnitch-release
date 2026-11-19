@@ -32,7 +32,8 @@ class DiscoveryTest(unittest.TestCase):
         path = "/downloads/littlesnitch/LittleSnitch-6.5.dmg"
         [release] = mirror.discover(MAC_STABLE, page(path, mirror.ORIGIN + path,
                                                    "https://example.com" + path))
-        self.assertEqual(release.tag, "mac-stable-6.5")
+        self.assertEqual(release.tag, "mac-v006.005.000-stable")
+        self.assertEqual(release.legacy_tag, "mac-stable-6.5")
         self.assertEqual(len(release.assets), 1)
         self.assertTrue(release.source.latest)
         self.assertIn("/releases?q=Beta)", mirror.notes(release))
@@ -43,11 +44,22 @@ class DiscoveryTest(unittest.TestCase):
             channel = source.channel
             path = f"/downloads/littlesnitch/{channel}/LittleSnitch-{version}-{channel}-%28{build}%29.dmg"
             [release] = mirror.discover(source, page(path))
-            self.assertEqual(release.tag, f"mac-{channel}-{version}-{build}")
+            self.assertEqual(release.legacy_tag, f"mac-{channel}-{version}-{build}")
             self.assertTrue(release.source.prerelease)
             self.assertFalse(release.source.github_prerelease)
             self.assertEqual(release.assets[0].published_name, f"LittleSnitch-{version}-{channel}-{build}.dmg")
             self.assertIn(release.assets[0].name, mirror.notes(release))
+
+    def test_mac_tags_sort_by_version_before_channel(self):
+        versions = [
+            (BETA, "7.0", "8020"), (BETA, "7.0", "8013"),
+            (NIGHTLY, "6.5.1", "7309"), (MAC_STABLE, "6.5", ""),
+            (NIGHTLY, "6.5", "7300"), (MAC_STABLE, "6.4.1", ""),
+        ]
+        tags = [mirror.Release(source, version, (), build).tag for source, version, build in versions]
+        self.assertEqual(tags, sorted(tags, reverse=True))
+        self.assertGreater(mirror.Release(MAC_STABLE, "6.10", ()).tag,
+                           mirror.Release(MAC_STABLE, "6.9", ()).tag)
 
     def test_mac_legacy_with_gzip(self):
         releases = mirror.discover(LEGACY, page(
@@ -147,10 +159,11 @@ class IntegrityTest(unittest.TestCase):
     def test_complete_published_release_does_not_download_again(self):
         [release] = mirror.discover(
             MAC_STABLE, page("/downloads/littlesnitch/LittleSnitch-6.5.dmg"))
-        previous = {"draft": False, "prerelease": False, "assets": [
+        previous = {"tag_name": release.legacy_tag, "draft": False, "prerelease": False, "assets": [
             {"name": name, "state": "uploaded", "digest": "sha256:abc"}
             for name in (mirror.CHECKSUMS, release.assets[0].published_name)
         ]}
+        releases = {release.legacy_tag: previous}
         with patch.object(mirror, "save_assets") as save:
-            mirror.publish(release, previous, None)
+            mirror.publish(release, mirror.existing_release(release, releases), None)
             save.assert_not_called()
