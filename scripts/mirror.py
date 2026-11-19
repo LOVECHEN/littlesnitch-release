@@ -32,6 +32,11 @@ MAC_NAME = re.compile(
     rf"LittleSnitch[-_](?P<version>{VERSION})(?:-(?P<channel>nightly|beta)-"
     r"\((?P<build>\d+)\))?\.dmg(?P<gzip>\.gz)?"
 )
+MAC_STABLE_HEADING = re.compile(
+    rf"<h3\b[^>]*>\s*Little\s+Snitch\s+({VERSION})\s*"
+    r"<span\b[^>]*>\s*\((\d+)\)\s*</span>\s*</h3>",
+    re.IGNORECASE,
+)
 LINUX_ID = re.compile(rf"littlesnitch-(?P<version>{VERSION}(?:-pre\d+)?)"
                       r"\.hashes\.txt(?:\.sig\.github\.json)?")
 LINUX_PACKAGES = (
@@ -121,10 +126,10 @@ class Release:
         build = f"-{int(self.build):08d}" if self.build else ""
         return f"mac-v{version}-{self.source.channel}{build}"
 
-    @property
-    def title(self):
+    def title(self, build_hint=""):
         product = "macOS" if self.source.platform == "mac" else "Linux"
-        build = f" ({self.build})" if self.build else ""
+        number = self.build or build_hint
+        build = f" ({number})" if number else ""
         return f"Little Snitch for {product} {self.version}{build} · {self.source.channel.title()}"
 
 
@@ -244,6 +249,32 @@ def version_key(version_build):
     version, build = version_build
     base, _, pre = version.partition("-pre")
     return tuple(map(int, base.split("."))), int(pre) if pre else sys.maxsize, int(build or 0)
+
+
+def stable_build_from_notes(html, version):
+    matches = {build for number, build in MAC_STABLE_HEADING.findall(html) if number == version}
+    return matches.pop() if len(matches) == 1 else ""
+
+
+def official_build_hint(release, directory):
+    if release.source.platform != "mac" or release.build:
+        return ""
+    major = release.version.split(".", 1)[0]
+    if major in {"1", "2"}:
+        # These original installers and their bundled apps agree on CFBundleVersion.
+        return {"1.2.4": "256", "2.5.4": "3019"}.get(release.version, "")
+    pages = [f"releasenotes{major}.html"]
+    if release.source.latest:
+        pages.append("releasenotes.html")
+    for page in pages:
+        try:
+            file = directory / "release-notes.html"
+            download(f"{ORIGIN}/products/littlesnitch/{page}", file, 4 * MIB)
+            if build := stable_build_from_notes(file.read_text(encoding="utf-8"), release.version):
+                return build
+        except (OSError, HTTPException, ValueError):
+            continue
+    return ""
 
 
 def validate_dmg(path, compressed):
@@ -368,9 +399,10 @@ def publish(release, previous, directory):
 
     digests = save_assets(release, directory)
     body = notes(digests)
+    title = release.title(official_build_hint(release, directory))
     if not previous:
         gh("release", "create", tag, "-R", REPO, "--draft", "--latest=false",
-           f"--prerelease={str(prerelease).lower()}", "--title", release.title,
+           f"--prerelease={str(prerelease).lower()}", "--title", title,
            "--notes", body, "--target", os.environ["GITHUB_SHA"])
     uploaded = release_assets(tag)
     if not uploaded.keys() <= digests.keys():
@@ -385,7 +417,7 @@ def publish(release, previous, directory):
         gh("release", "upload", tag, "-R", REPO, *missing)
     verify_uploaded(tag, digests, release_assets(tag))
     gh("release", "edit", tag, "-R", REPO, "--draft=false",
-       "--notes", body,
+       "--notes", body, "--title", title,
        f"--latest={str(release.source.latest).lower()}",
        f"--prerelease={str(prerelease).lower()}")
 

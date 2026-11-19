@@ -58,6 +58,24 @@ class DiscoveryTest(unittest.TestCase):
         self.assertGreater(mirror.Release(MAC_STABLE, "6.10", ()).tag,
                            mirror.Release(MAC_STABLE, "6.9", ()).tag)
 
+    def test_stable_build_hint_changes_the_title_not_the_tag(self):
+        release = mirror.Release(MAC_STABLE, "6.5", ())
+        html = (
+            '<h3>Little Snitch 6.5 nightly <span class="buildnumber-visible">(7300)</span></h3>'
+            '<h3 id="first-releasenotes-headline">Little Snitch 6.5 '
+            '<span class="buildnumber">(7303)</span></h3>'
+        )
+        build = mirror.stable_build_from_notes(html, release.version)
+        self.assertEqual(build, "7303")
+        self.assertEqual(release.title(build), "Little Snitch for macOS 6.5 (7303) · Stable")
+        self.assertEqual(release.tag, "mac-v006.005.000-stable")
+        self.assertEqual(mirror.stable_build_from_notes(html, "6.5.1"), "")
+        self.assertEqual(mirror.stable_build_from_notes(html + html.replace("7303", "7304"), "6.5"), "")
+
+    def test_old_builds_from_verified_original_installers(self):
+        self.assertEqual(mirror.official_build_hint(mirror.Release(LEGACY, "1.2.4", ()), None), "256")
+        self.assertEqual(mirror.official_build_hint(mirror.Release(LEGACY, "2.5.4", ()), None), "3019")
+
     def test_mac_legacy_with_gzip(self):
         releases = mirror.discover(LEGACY, page(
             "/downloads/littlesnitch/legacy/LittleSnitch-3.8.2.dmg",
